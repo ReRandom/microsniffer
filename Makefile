@@ -1,2 +1,2 @@
 all: sniff.c
-	gcc sniff.c -lpcap -o sniffer
+	gcc sniff.c -lpcap -o sniffer -g

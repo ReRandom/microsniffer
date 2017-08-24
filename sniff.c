@@ -68,8 +68,47 @@ void print_raw(u_char *arg, const struct pcap_pkthdr *pkthdr,
 	printf("\n");
 }
 
-void print_ip(u_char *arg, const struct pcap_pkthdr *pkthdr,
-		const u_char *packet, struct color *colors)
+void print_udp(const u_char *packet, struct color *colors)
+{
+	struct color *temp = (struct color*)malloc(sizeof(struct color));
+	colors->next = temp;
+	temp->str = "\x1b[43m\x1b[34m";
+	temp->start = 0;
+	temp->end = 1;
+	temp->next = (struct color*) malloc(sizeof(struct color));
+	temp = temp->next;
+	temp->str = "\x1b[44m\x1b[33m";
+	temp->start = 2;
+	temp->end = 3;
+	temp->next = NULL;
+	printf("(UDP)\nport destination: \x1b[43m\x1b[34m%hu (0x%1$04x)\x1b[0m port source: \x1b[44m\x1b[33m%2$hu (0x%2$04x)\x1b[0m\n",
+			ntohs(*(unsigned short*)(&packet[0])),
+			ntohs(*(unsigned short*)(&packet[2])));
+	printf("len: %hu checksum: %hu\n", ntohs(*(unsigned short*)(&packet[4])),
+			ntohs(*(unsigned short*)(&packet[6])));
+}
+
+void print_tcp(const u_char *packet, struct color *colors)
+{
+	struct color *temp = (struct color*)malloc(sizeof(struct color));
+	colors->next = temp;
+	temp->str = "\x1b[43m\x1b[34m";
+	temp->start = 0;
+	temp->end = 1;
+	temp->next = (struct color*) malloc(sizeof(struct color));
+	temp = temp->next;
+	temp->next = NULL;
+	temp->str = "\x1b[44m\x1b[33m";
+	temp->start = 2;
+	temp->end = 3;
+	printf("(TCP)\nport destination: \x1b[43m\x1b[34m%hu\x1b[0m (\x1b[43m\x1b[34m0x%1$04x\x1b[0m) port source: \x1b[44m\x1b[33m%hu\x1b[0m (\x1b[44m\x1b[33m0x%2$04x\x1b[0m)\n",
+			ntohs(*(unsigned short*)(&packet[0])),
+			ntohs(*(unsigned short*)(&packet[2])));
+	printf("len: %hhu checksum: %hu\n", (packet[12] & 0xf0)/4,
+			ntohs(*(unsigned short*)(&packet[16])));
+}
+
+void print_ip(const u_char *packet, struct color *colors)
 {
 	struct color *temp = (struct color*)malloc(sizeof(struct color));
 	colors->next = temp;
@@ -96,6 +135,26 @@ void print_ip(u_char *arg, const struct pcap_pkthdr *pkthdr,
 	printf("IP destination: \x1b[36m%hhu.%hhu.%hhu.%hhu\x1b[0m (\x1b[36m0x%08x\x1b[0m)\n",
 			packet[16], packet[17], packet[18], packet[19],
 			ntohl(*(unsigned*)(&packet[16])));
+	if(packet[9] == 17)
+	{
+		print_udp(&packet[(packet[0]&0xf)*4], temp);
+		while(temp->next != NULL)
+		{
+			temp = temp->next;
+			temp->start += (packet[0] & 0xf)*4;
+			temp->end += (packet[0] & 0xf)*4;
+		}
+	}
+	else if(packet[9] == 6)
+	{
+		print_tcp(&packet[(packet[0]&0xf)*4], temp);
+		while(temp->next != NULL)
+		{
+			temp = temp->next;
+			temp->start += (packet[0] & 0xf)*4;
+			temp->end += (packet[0] & 0xf)*4;
+		}
+	}
 }
 
 void free_color(struct color *color)
@@ -141,7 +200,7 @@ void print_packet(u_char *arg, const struct pcap_pkthdr *pkthdr,
 	//if type == 0x0800
 	if(packet[12] == 0x8 && packet[13] == 0x0)
 	{
-		print_ip(arg, pkthdr, &packet[i], temp);
+		print_ip(&packet[i], temp);
 		while(temp->next != NULL)
 		{
 			temp->next->start += i;
