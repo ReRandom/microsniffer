@@ -261,6 +261,7 @@ int main(int argc, char *argv[])
 	if(interface == NULL)
 	{
 		print_help(argv[0]);
+		free(print_bytes);
 		return 1;
 	}
 	char str_err[100];
@@ -272,6 +273,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	int ret = pcap_loop(dev, size, print_packet, (u_char*)print_bytes);
+	if(ret == -1)
+	{
+		pcap_perror(dev, "pcap_loop:");
+	}
+	free(print_bytes);
 	pcap_close(dev);
 	return 0;
 }
